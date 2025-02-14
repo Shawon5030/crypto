@@ -19,10 +19,10 @@ load_dotenv()
 sentiment_model = pipeline("sentiment-analysis", model="nlptown/bert-base-multilingual-uncased-sentiment")
 
 # Notification Config
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-NTFY_TOPIC = os.getenv("NTFY_TOPIC")
-TRADING_TYPE = os.getenv("TRADING_TYPE", "short-term")
+TELEGRAM_BOT_TOKEN = '7641277983:AAEw_lC8aeX6vLFPu_xhx8VMHtNKUOBSvxo'
+TELEGRAM_CHAT_ID = '5642129186'
+NTFY_TOPIC = 'crypto_mj'
+TRADING_TYPE = 'intraday'
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
