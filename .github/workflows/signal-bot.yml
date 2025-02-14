@@ -1,0 +1,32 @@
+name: Crypto Signal Bot
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # প্রতি 15 মিনিট পর পর রান করবে
+    - cron: '0 0 * * *'      # প্রতিদিন রাত 12:00 AM (UTC) রান করবে
+  workflow_dispatch:         # ম্যানুয়ালি রান করার অপশন
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r cryptos/requirements.txt
+
+      - name: Run Crypto Signal Bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          python cryptos/bot.py
