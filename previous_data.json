@@ -1,0 +1,12 @@
+{
+    "prices": {
+        "BTC": 96571,
+        "ETH": 2687.17,
+        "SOL": 196.93
+    },
+    "signals": {
+        "BTC": "BUY \u2705",
+        "ETH": "BUY \u2705",
+        "SOL": "BUY \u2705"
+    }
+}

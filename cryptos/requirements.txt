@@ -1,0 +1,8 @@
+requests
+yfinance
+pandas
+transformers
+python-dotenv
+schedule
+telegram
+python-telegram-bot
