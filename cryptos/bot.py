@@ -8,22 +8,24 @@ from dotenv import load_dotenv
 import json
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackContext
-from threading import Thread
 
 # Load environment variables
 load_dotenv()
+
+# Logging setup
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Initialize Sentiment Model
 sentiment_model = pipeline("sentiment-analysis", model="nlptown/bert-base-multilingual-uncased-sentiment")
 
 # Notification Config
-TELEGRAM_BOT_TOKEN = '7641277983:AAEw_lC8aeX6vLFPu_xhx8VMHtNKUOBSvxo'
-TELEGRAM_CHAT_ID = '5642129186'
-NTFY_TOPIC = 'crypto_mj'
-TRADING_TYPE = 'intraday'
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+NTFY_TOPIC = "crypto_mj"
 
-# Logging setup
-logging.basicConfig(level=logging.INFO)
+# Ensure token exists
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("❌ TELEGRAM_BOT_TOKEN is missing from environment variables!")
 
 # Load previous data
 def load_previous_data():
@@ -31,7 +33,7 @@ def load_previous_data():
         with open("previous_data.json", "r") as file:
             return json.load(file)
     except FileNotFoundError:
-        return {"prices": {}, "deviations": {}, "signals": {}}
+        return {"prices": {}, "signals": {}}
 
 # Save current data
 def save_current_data(data):
@@ -40,73 +42,65 @@ def save_current_data(data):
 
 # Fetch crypto prices
 def get_crypto_prices():
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd"
-    response = requests.get(url)
-    data = response.json()
-    return {
-        "BTC": data["bitcoin"]["usd"],
-        "ETH": data["ethereum"]["usd"],
-        "SOL": data.get("solana", {}).get("usd", 0)  # Handle missing Solana data
-    }
-
-# Fetch market data from Yahoo Finance
-def get_market_data(ticker, period="1mo"):
-    return yf.download(ticker, period=period)["Close"]
-
-# Calculate correlation between two assets
-def calculate_correlation(series1, series2):
-    df = pd.concat([series1, series2], axis=1, join='inner').dropna()
-    correlation = df.corr().iloc[0, 1] if len(df) >= 2 else None
-    if correlation is None:
-        return "Data Unavailable"
-    elif correlation > 0.5:
-        return f"{correlation:.2f} (Strong Positive)"
-    elif 0.2 < correlation <= 0.5:
-        return f"{correlation:.2f} (Moderate Positive)"
-    elif -0.2 <= correlation <= 0.2:
-        return f"{correlation:.2f} (Weak/No Correlation)"
-    elif -0.5 <= correlation < -0.2:
-        return f"{correlation:.2f} (Moderate Negative)"
-    else:
-        return f"{correlation:.2f} (Strong Negative)"
-
-# Analyze sentiment using NLP model
-def analyze_sentiment(text):
-    result = sentiment_model(text)
-    return result[0]['label']
+    try:
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return {
+            "BTC": data.get("bitcoin", {}).get("usd", 0),
+            "ETH": data.get("ethereum", {}).get("usd", 0),
+            "SOL": data.get("solana", {}).get("usd", 0)
+        }
+    except requests.exceptions.RequestException as e:
+        logging.error(f"⚠️ Error fetching prices: {e}")
+        return {"BTC": 0, "ETH": 0, "SOL": 0}
 
 # Fetch sentiment data from CoinGecko
 def get_sentiment(coin_id):
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
-    response = requests.get(url)
-    data = response.json()
-    
-    up_votes = data.get("sentiment_votes_up_percentage", 0)
-    down_votes = data.get("sentiment_votes_down_percentage", 0)
-    
-    return {"up_votes": up_votes, "down_votes": down_votes}
+    try:
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}"
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return {
+            "up_votes": data.get("sentiment_votes_up_percentage", 0),
+            "down_votes": data.get("sentiment_votes_down_percentage", 0)
+        }
+    except requests.exceptions.RequestException as e:
+        logging.error(f"⚠️ Error fetching sentiment for {coin_id}: {e}")
+        return {"up_votes": 0, "down_votes": 0}
 
-# Determine trading signal based on sentiment
+# Determine trading signal
 def determine_signal(sentiment):
     up = sentiment["up_votes"]
-    
-    if up > 75:  
+    if up > 75:
         return "BUY ✅"
-    elif up > 50:  
+    elif up > 50:
         return "HOLD ⚖️"
-    else:  
+    else:
         return "SELL ❌"
 
 # Send notifications
 def send_telegram_notification(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    requests.post(url, data=payload)
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
+        response = requests.post(url, data=payload, timeout=10)
+        response.raise_for_status()
+        logging.info("✅ Telegram notification sent.")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"⚠️ Error sending Telegram message: {e}")
 
 def send_ntfy_notification(report):
-    url = f"https://ntfy.sh/{NTFY_TOPIC}"
-    headers = {"Title": "Market Sentiment Report", "Priority": "high"}
-    requests.post(url, data=report.encode("utf-8"), headers=headers)
+    try:
+        url = f"https://ntfy.sh/{NTFY_TOPIC}"
+        headers = {"Title": "Market Sentiment Report", "Priority": "high"}
+        response = requests.post(url, data=report.encode("utf-8"), headers=headers, timeout=10)
+        response.raise_for_status()
+        logging.info("✅ NTFY notification sent.")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"⚠️ Error sending NTFY message: {e}")
 
 # Generate Market Report
 def generate_report(check_changes=True):
@@ -132,15 +126,16 @@ def generate_report(check_changes=True):
     )
 
     if not check_changes or signals_changed:
-        send_telegram_notification(f"🚦 BTC: {btc_signal}\nETH: {eth_signal}\nSOL: {sol_signal}")
-        send_ntfy_notification(f"BTC: {btc_signal}, ETH: {eth_signal}, SOL: {sol_signal}")
+        message = f"🚦 BTC: {btc_signal}\nETH: {eth_signal}\nSOL: {sol_signal}"
+        send_telegram_notification(message)
+        send_ntfy_notification(message)
         logging.info("✅ Signals sent successfully.")
     else:
         logging.info("No changes in trading signals.")
 
     save_current_data({"prices": prices, "signals": {"BTC": btc_signal, "ETH": eth_signal, "SOL": sol_signal}})
 
-# Telegram Bot Commands (Now Async)
+# Telegram Bot Commands
 async def start(update: Update, context: CallbackContext):
     await update.message.reply_text("Welcome to the Crypto Bot! Use /signals to get the latest trading signals.")
 
@@ -158,14 +153,22 @@ async def signals(update: Update, context: CallbackContext):
 
 # Run Telegram Bot
 def main():
-    # Create an Application instance instead of Updater
+    logging.info("🚀 Starting Telegram Bot...")
+
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+    # Ensure webhook is removed before polling to avoid conflicts
+    try:
+        application.bot.delete_webhook()
+        logging.info("✅ Webhook removed.")
+    except Exception as e:
+        logging.warning(f"⚠️ Error removing webhook: {e}")
 
     # Add command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("signals", signals))
 
-    # Start the bot and run it
+    logging.info("🤖 Bot is running...")
     application.run_polling()
 
 if __name__ == "__main__":
