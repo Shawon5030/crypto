@@ -140,11 +140,11 @@ def generate_report(check_changes=True):
 
     save_current_data({"prices": prices, "signals": {"BTC": btc_signal, "ETH": eth_signal, "SOL": sol_signal}})
 
-# Telegram Bot Commands
-def start(update: Update, context: CallbackContext):
-    update.message.reply_text("Welcome to the Crypto Bot! Use /signals to get the latest trading signals.")
+# Telegram Bot Commands (Now Async)
+async def start(update: Update, context: CallbackContext):
+    await update.message.reply_text("Welcome to the Crypto Bot! Use /signals to get the latest trading signals.")
 
-def signals(update: Update, context: CallbackContext):
+async def signals(update: Update, context: CallbackContext):
     previous_data = load_previous_data()
     signals = previous_data.get("signals", {})
 
@@ -154,7 +154,7 @@ def signals(update: Update, context: CallbackContext):
 - ETH: {signals.get("ETH", "N/A")}
 - SOL: {signals.get("SOL", "N/A")}
 """
-    update.message.reply_text(message)
+    await update.message.reply_text(message)
 
 # Run Telegram Bot
 def main():
