@@ -2,7 +2,9 @@ name: Crypto Signal Bot
 
 on:
   schedule:
-    - cron: "0 * * * *"  # প্রতি ঘন্টায় রান হবে (পরিবর্তন করতে পারেন)
+    - cron: "0 * * * *"
+    - cron: '*/15 * * * *'   # প্রতি 15 মিনিট পর পর রান করবে
+   
   push:
     branches:
       - main  # শুধু main branch-এ push হলে রান হবে
