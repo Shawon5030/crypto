@@ -6,10 +6,8 @@ import pandas as pd
 from transformers import pipeline
 from dotenv import load_dotenv
 import json
-import schedule
-import time
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackContext
 from threading import Thread
 
 # Load environment variables
@@ -160,24 +158,15 @@ def signals(update: Update, context: CallbackContext):
 
 # Run Telegram Bot
 def main():
-    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    # Create an Application instance instead of Updater
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("signals", signals))
+    # Add command handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("signals", signals))
 
-    updater.start_polling()
-    updater.idle()
-
-# Run schedule every 15 minutes
-def schedule_reports():
-    schedule.every(15).minutes.do(generate_report)
-    schedule.every().day.at("00:00").do(lambda: generate_report(check_changes=False))
-    
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+    # Start the bot and run it
+    application.run_polling()
 
 if __name__ == "__main__":
-    Thread(target=schedule_reports).start()
     main()
